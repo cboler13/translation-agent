@@ -6,7 +6,7 @@ if __name__ == "__main__":
     start_time = time.time() # start timer
     source_lang, target_lang, country = "English", "Czech", "United States"
 
-    relative_path = "sample-texts/sample.txt"
+    relative_path = "sample-texts/sample-long1.txt"
     script_dir = os.path.dirname(os.path.abspath(__file__))
 
     full_path = os.path.join(script_dir, relative_path)

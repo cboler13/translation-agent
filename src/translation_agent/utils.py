@@ -101,7 +101,7 @@ def one_chunk_initial_translation(
 
     Do NOT output anything other than the final translation of the indicated part of the text. 
     
-    And remember, Output only the final translation of the portion you are asked to translate, and nothing else. \
+    And remember, Output only the final translation of {source_text} you are asked to translate, and nothing else. \
      
     {source_lang}: {source_text}
 
