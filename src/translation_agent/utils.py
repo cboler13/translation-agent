@@ -1,7 +1,7 @@
 import os
 from typing import List
 from typing import Union
-
+import time
 import openai
 import tiktoken
 from dotenv import load_dotenv
@@ -21,7 +21,7 @@ MAX_TOKENS_PER_CHUNK = (
 def get_completion(
     prompt: str,
     system_message: str = "You are a helpful assistant.",
-    model: str = "gpt-4-turbo",
+    model: str = "gpt-3.5-turbo", # gpt-3.5-turbo gpt-4o
     temperature: float = 0.3,
     json_mode: bool = False,
 ) -> Union[str, dict]:
@@ -71,7 +71,7 @@ def get_completion(
 
 
 def one_chunk_initial_translation(
-    source_lang: str, target_lang: str, source_text: str
+    source_lang: str, target_lang: str, source_text: str, country: str = "",
 ) -> str:
     """
     Translate the entire text as one chunk using an LLM.
@@ -87,11 +87,33 @@ def one_chunk_initial_translation(
 
     system_message = f"You are an expert linguist, specializing in translation from {source_lang} to {target_lang}."
 
-    translation_prompt = f"""This is an {source_lang} to {target_lang} translation, please provide the {target_lang} translation for this text. \
-Do not provide any explanations or text apart from the translation.
-{source_lang}: {source_text}
+    translation_prompt = f"""This is an {source_lang} to {target_lang} translation, but you will be following a series of 
+    steps to arrive at a final translation. While all these steps will be performed by you, the only text you will output 
+    is the final {target_lang} translation you arrive at. 
 
-{target_lang}:"""
+    Translate the following {source_text} from {source_lang} to {target_lang}.  
+    Here are the steps you must Follow when executing the translation: 
+    1. Translate {source_text} from {source_lang} to {target_lang}
+    2. Carefully read the source text and the translation you just made from {source_lang} to {target_lang}, and then give constructive criticism and helpful suggestions to improve your previous translation. \
+    3. Edit the translation using the suggestions created in the previous step. The final style and tone of the translation should match the style of {target_lang} colloquially spoken in {country}.
+    4. Repeat steps 2 and 3 until you cannot find any more suggestions to improve the translation. 
+    Perform all these steps, but only print out the final translated version.
+
+    Do NOT output anything other than the final translation of the indicated part of the text. 
+    
+    And remember, Output only the final translation of the portion you are asked to translate, and nothing else. \
+     
+    {source_lang}: {source_text}
+
+    {target_lang}:
+    
+    
+    
+    
+
+"""
+
+
 
     prompt = translation_prompt.format(source_text=source_text)
 
@@ -255,19 +277,26 @@ def one_chunk_translate_text(
     Returns:
         str: The improved translation of the source text.
     """
+    # start_timer = time.time()
+
     translation_1 = one_chunk_initial_translation(
         source_lang, target_lang, source_text
     )
 
-    reflection = one_chunk_reflect_on_translation(
-        source_lang, target_lang, source_text, translation_1, country
-    )
-    translation_2 = one_chunk_improve_translation(
-        source_lang, target_lang, source_text, translation_1, reflection
-    )
+    # reflection = one_chunk_reflect_on_translation(
+    #    source_lang, target_lang, source_text, translation_1, country
+    #)
 
-    return translation_2
+    #translation_2 = one_chunk_improve_translation(
+    #    source_lang, target_lang, source_text, translation_1, reflection
+    #)
 
+    # end_timer = time.time()
+    # chunk_time = start_timer - end_timer
+    # print("1 chunk translate :" + {chunk_time})
+    return translation_1
+
+   
 
 def num_tokens_in_string(
     input_str: str, encoding_name: str = "cl100k_base"
@@ -295,7 +324,7 @@ def num_tokens_in_string(
 
 
 def multichunk_initial_translation(
-    source_lang: str, target_lang: str, source_text_chunks: List[str]
+    source_lang: str, target_lang: str, source_text_chunks: List[str], country: str = "",
 ) -> List[str]:
     """
     Translate a text in multiple chunks from the source language to the target language.
@@ -313,20 +342,37 @@ def multichunk_initial_translation(
 
     translation_prompt = """Your task is provide a professional translation from {source_lang} to {target_lang} of PART of a text.
 
-The source text is below, delimited by XML tags <SOURCE_TEXT> and </SOURCE_TEXT>. Translate only the part within the source text
-delimited by <TRANSLATE_THIS> and </TRANSLATE_THIS>. You can use the rest of the source text as context, but do not translate any
-of the other text. Do not output anything other than the translation of the indicated part of the text.
+The source text is below, delimited by XML tags <SOURCE_TEXT> and </SOURCE_TEXT>.
+
+This is an {source_lang} to {target_lang} translation, but you will be following a series of 
+steps to arrive at a final translation. While all these steps will be performed by you, 
+the only text you will output is the final {target_lang} translation you arrive at. 
+Here are the steps:
+1. Translate only the part within the source text
+    delimited by <TRANSLATE_THIS> and </TRANSLATE_THIS>. You can use the rest of the source text as context, but do not translate any
+    of the other text. Translate this specified text from {source_lang} to {target_lang}.
+2. Carefully read the source text and the translation you just made from {source_lang} to {target_lang}, and then give constructive criticism and helpful suggestions to improve your previous translation. \
+3. Edit the translation using the suggestions created in the previous step. The final style and tone of the translation should match the style of {target_lang} colloquially spoken in {country}.
+4. Repeat steps 2 and 3 until you cannot find any more suggestions to improve the translation. 
+Perform all these steps, but only print out the final translated version.
+
+    
+Do NOT output anything other than the final translation of the indicated part of the text. 
+    
+And remember, Output only the final translation of the portion you are asked to translate, and nothing else. \
 
 <SOURCE_TEXT>
 {tagged_text}
 </SOURCE_TEXT>
 
-To reiterate, you should translate only this part of the text, shown here again between <TRANSLATE_THIS> and </TRANSLATE_THIS>:
+To reiterate, you should translate, create suggestions, and retranslate based on those suggestions
+ only this part of the text, shown here again between <TRANSLATE_THIS> and </TRANSLATE_THIS>:
+
 <TRANSLATE_THIS>
 {chunk_to_translate}
 </TRANSLATE_THIS>
 
-Output only the translation of the portion you are asked to translate, and nothing else.
+And remember, Output only the final translation of the portion you are asked to translate, and nothing else.
 """
 
     translation_chunks = []
@@ -341,6 +387,7 @@ Output only the translation of the portion you are asked to translate, and nothi
         )
 
         prompt = translation_prompt.format(
+            country= country,
             source_lang=source_lang,
             target_lang=target_lang,
             tagged_text=tagged_text,
@@ -581,23 +628,23 @@ def multichunk_translation(
         source_lang, target_lang, source_text_chunks
     )
 
-    reflection_chunks = multichunk_reflect_on_translation(
-        source_lang,
-        target_lang,
-        source_text_chunks,
-        translation_1_chunks,
-        country,
-    )
+    # reflection_chunks = multichunk_reflect_on_translation(
+    #     source_lang,
+    #    target_lang,
+    #    source_text_chunks,
+    #    translation_1_chunks,
+    #    country,
+    #)
 
-    translation_2_chunks = multichunk_improve_translation(
-        source_lang,
-        target_lang,
-        source_text_chunks,
-        translation_1_chunks,
-        reflection_chunks,
-    )
+    #translation_2_chunks = multichunk_improve_translation(
+    #    source_lang,
+    #    target_lang,
+    #    source_text_chunks,
+    #    translation_1_chunks,
+    #    reflection_chunks,
+    #)
 
-    return translation_2_chunks
+    return translation_1_chunks # return translation
 
 
 def calculate_chunk_size(token_count: int, token_limit: int) -> int:
@@ -652,8 +699,10 @@ def translate(
 
     num_tokens_in_text = num_tokens_in_string(source_text)
 
-    ic(num_tokens_in_text)
+    ic(num_tokens_in_text) # print debugging
 
+
+    # tokens less than chunk, just call one_chunk_translate_text()
     if num_tokens_in_text < max_tokens:
         ic("Translating text as single chunk")
 
@@ -662,16 +711,28 @@ def translate(
         )
 
         return final_translation
+    
+    # api c
+
+
+
+    # token more than one chunk then:
+
+    
+    # get total chunk count
 
     else:
         ic("Translating text as multiple chunks")
-
+        # calculate chunk size 
         token_size = calculate_chunk_size(
             token_count=num_tokens_in_text, token_limit=max_tokens
         )
 
+        # print
         ic(token_size)
 
+        # split into multiple chunks using 
+        # RecursiveCharacterTextSplitter.from_tiktoken_encoder() with gpt-4
         text_splitter = RecursiveCharacterTextSplitter.from_tiktoken_encoder(
             model_name="gpt-4",
             chunk_size=token_size,
@@ -684,4 +745,7 @@ def translate(
             source_lang, target_lang, source_text_chunks, country
         )
 
+
         return "".join(translation_2_chunks)
+    
+    # api calls: 
