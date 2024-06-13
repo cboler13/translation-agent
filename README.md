@@ -71,3 +71,60 @@ A few academic research groups are also starting to look at LLM-based and agenti
 - *Beyond Human Translation: Harnessing Multi-Agent Collaboration for Translating Ultra-Long Literary Texts*, Wu et al. (2024),  https://arxiv.org/pdf/2405.11804
 
 
+
+# **UPDATE**
+To improve both costs and speed, Ladi and I have updated the translation method.
+Before, **3N calls** to the Open AI API had to be called, (where N is the number of 'chunks' in the translatable text). 
+
+We've reconfigured utils so that only **1N calls** must be made to the API, but the same quality of translation *should* be achieved. Should be cheaper and faster now.
+
+# How it works
+Before, this was the structure of calling. 
+if text is < Chunk Size (1,000c)
+Single Chunk:
+One_chunk_initial_translation (1 call)
+One_chunk_reflect_on_translation (1 call)
+One_chunk_improve_translation (1 call)
+= 3 calls to Open AI API
+
+if text is > Chunk Size
+Multi Chunk:
+Multichunk_initial_translation (n calls)
+Multichunk_reflect_on_translation (n calls)
+Multichunk_improve_translation (n calls)
+= 3n calls
+
+Now, we've tried to combine all the agentic calls to the API into one. We ask ChatGPT to perform all the steps it performed before (initial, reflect, improve) but to do this in the background and only output the final translation. Therefore, while ChatGPT is performing all the analysis, it's only actually charging you for the text it outputs. 
+
+For example, here's the one_chunk_initial_translation call to the OpenAI API:
+
+    "This is an {source_lang} to {target_lang} translation, but you will be following a series of 
+    steps to arrive at a final translation. While all these steps will be performed by you, the only text you will output 
+    is the final {target_lang} translation you arrive at. 
+
+    Translate the following {source_text} from {source_lang} to {target_lang}.  
+    Here are the steps you must Follow when executing the translation: 
+    1. Translate {source_text} from {source_lang} to {target_lang}
+    2. Carefully read the source text and the translation you just made from {source_lang} to {target_lang}, and then give constructive criticism and helpful suggestions to improve your previous translation. \
+    3. Edit the translation using the suggestions created in the previous step. The final style and tone of the translation should match the style of {target_lang} colloquially spoken in {country}.
+    4. Repeat steps 2 and 3 until you cannot find any more suggestions to improve the translation. 
+    Perform all these steps, but only print out the final translated version.
+
+    Do NOT output anything other than the final translation of the indicated part of the text. 
+    
+    And remember, Output only the final translation of the portion you are asked to translate, and nothing else. \
+     
+    {source_lang}: {source_text}
+
+    {target_lang}:"
+
+As you can see, we can essentially get more **bang for our buck** by compressing everything we want the API to do for us into one call.
+
+There is still a lot of testing and translation quality analysis to be done to ensure the quality really is an improvement from an initial translation, but so far our early tests are promising.
+    
+
+
+
+
+
+
