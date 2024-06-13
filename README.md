@@ -121,6 +121,10 @@ For example, here's the one_chunk_initial_translation call to the OpenAI API:
 As you can see, we can essentially get more **bang for our buck** by compressing everything we want the API to do for us into one call.
 
 There is still a lot of testing and translation quality analysis to be done to ensure the quality really is an improvement from an initial translation, but so far our early tests are promising.
+
+
+
+*Update* Material may not be recognized and translated unless there are no breaks in the .txt file. I will work on this tomorrow.
     
 
 
